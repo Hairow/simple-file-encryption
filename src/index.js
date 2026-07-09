@@ -1,4 +1,5 @@
 import pageHTML from "./page.html";
+import CryptoUtils from "./CryptoUtils";
 
 export default {
 	async fetch(request, env, ctx) {
@@ -12,11 +13,35 @@ export default {
 			return new Response("请配置 KEY_BASE64 和 COUNTER_BASE64 环境变量", { status: 500 });
 		}
 
-		// API: 获取密钥信息
-		if (url.pathname === "/api/keys") {
-			return new Response(JSON.stringify({ keyBase64, counterBase64 }), {
-				headers: { "Content-Type": "application/json" },
-			});
+		// API: 加解密
+		if (url.pathname === "/api/crypto" && request.method === "POST") {
+			try {
+				const body = await request.json();
+				const { head, tail } = body;
+
+				const headArrayBuf = CryptoUtils.base64ToArrayBuffer(head);
+				let encryptedHead = await CryptoUtils.encryptCTR(headArrayBuf, keyBase64, counterBase64);
+				encryptedHead = CryptoUtils.arrayBufferToBase64(encryptedHead)
+
+				let encryptedTail = null;
+				if (tail) {
+					const tailArrayBuf = CryptoUtils.base64ToArrayBuffer(tail);
+					encryptedTail = await CryptoUtils.encryptCTR(tailArrayBuf, keyBase64, counterBase64);
+					encryptedTail = CryptoUtils.arrayBufferToBase64(encryptedTail);
+				}
+
+				return new Response(JSON.stringify({
+					head: encryptedHead,
+					tail: encryptedTail
+				}), {
+					headers: { "Content-Type": "application/json" },
+				});
+			} catch (err) {
+				return new Response(JSON.stringify({ error: err.message }), {
+					status: 500,
+					headers: { "Content-Type": "application/json" },
+				});
+			}
 		}
 
 		// 静态页面

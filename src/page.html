@@ -254,7 +254,7 @@
 		<h1>文件简单加解密工具</h1>
 		<p class="subtitle">
 			AES-256-CTR · 流加密<br>
-			浏览器本地运行,输入输出长度完全相同,加密文件头尾各 100 字节,文件大小保持不变 <br>
+			输入输出长度完全相同,加密文件头尾各 100 字节,文件大小保持不变 <br>
 			<br>
 		</p>
 		<div class="key-badge"><span class="dot"></span>密钥已加载</div>
@@ -281,34 +281,40 @@
 	</div>
 
 	<script>
-		// ========== 浏览器端加解密逻辑 ==========
-
-		let keyBase64, counterBase64, cryptoKey = null;
-		(async function loadKeys() {
-			try {
-				const resp = await fetch('/api/keys');
-				const data = await resp.json();
-				keyBase64 = data.keyBase64;
-				counterBase64 = data.counterBase64;
-				console.log('[loadKeys] 密钥获取完成');
-
-				// 页面加载时预导入密钥，避免每次加解密重复导入
-				const rawKey = base64ToArrayBuffer(keyBase64);
-				cryptoKey = await crypto.subtle.importKey(
-					'raw', rawKey,
-					{ name: 'AES-CTR' }, false, ['encrypt', 'decrypt']
-				);
-				console.log('[loadKeys] CryptoKey 导入完成');
-			} catch (e) {
-				console.error('[loadKeys] 失败:', e);
-			}
-		})();
+		// ========== 浏览器端工具 ==========
 
 		function base64ToArrayBuffer(base64) {
 			const binary = atob(base64);
 			const bytes = new Uint8Array(binary.length);
 			for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
 			return bytes.buffer;
+		}
+
+		function arrayBufferToBase64(buffer) {
+			const bytes = new Uint8Array(buffer);
+			let binary = '';
+			for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+			return btoa(binary);
+		}
+
+		async function cryptoCall(headBuf, tailBuf) {
+			const resp = await fetch('/api/crypto', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					head: arrayBufferToBase64(headBuf),
+					tail: tailBuf ? arrayBufferToBase64(tailBuf) : null
+				})
+			});
+			if (!resp.ok) {
+				const err = await resp.json();
+				throw new Error(err.error || '服务端加解密失败');
+			}
+			const data = await resp.json();
+			return {
+				head: base64ToArrayBuffer(data.head),
+				tail: data.tail ? base64ToArrayBuffer(data.tail) : null
+			};
 		}
 
 		// ========== 目录 & 文件列表 ==========
@@ -464,33 +470,22 @@
 				const fileSize = file.size;
 				console.log('[processOne] 文件大小:', fileSize, 'bytes');
 
-				if (!cryptoKey) throw new Error('密钥未就绪');
-
-				// 只读取头尾，不读整个文件（避免大文件卡死）
-				const counter = base64ToArrayBuffer(counterBase64);
-				const algo = { name: 'AES-CTR', counter: counter, length: 64 };
-				console.log('[processOne] algo 就绪，开始读取头部...');
-
-				// FileReader 带 5 秒超时，文件被锁时不会无限卡死
+				// 读取头尾
+				console.log('[processOne] 读取头部...');
 				const headBuf = await readBlobWithTimeout(file.slice(0, HEAD_SIZE));
-				console.log('[processOne] 头部读取完成, 加密中...');
-				const encryptedHead = await crypto.subtle.encrypt(algo, cryptoKey, headBuf);
-				console.log('[processOne] 头部加密完成');
+				const tailBuf = fileSize > HEAD_SIZE + TAIL_SIZE
+					? await readBlobWithTimeout(file.slice(fileSize - TAIL_SIZE))
+					: null;
+				console.log('[processOne] 文件读取完成，提交到服务端...');
 
-				let encryptedTail = null;
-				if (fileSize > HEAD_SIZE + TAIL_SIZE) {
-					const tailBuf = await readBlobWithTimeout(file.slice(fileSize - TAIL_SIZE));
-					console.log('[processOne] 尾部读取完成, 加密中...');
-					encryptedTail = await crypto.subtle.encrypt(algo, cryptoKey, tailBuf);
-					console.log('[processOne] 尾部加密完成');
-				}
-
-				console.log('[processOne] 写入文件...');
+				// 提交到 Worker 加解密
+				const result = await cryptoCall(headBuf, tailBuf);
+				console.log('[processOne] 加解密完成，写入文件...');
 				const writable = await entry.handle.createWritable({ keepExistingData: true });
-				await writable.write(encryptedHead);
-				if (encryptedTail) {
+				await writable.write(result.head);
+				if (result.tail) {
 					await writable.seek(fileSize - TAIL_SIZE);
-					await writable.write(encryptedTail);
+					await writable.write(result.tail);
 				}
 				await writable.close();
 				console.log('[processOne] 写入完成');
@@ -498,7 +493,7 @@
 				btn.className = 'file-action-btn done';
 				btn.textContent = '已完成';
 				btn.disabled = false;
-				showStatus('success', '「' + entry.name + '」处理完成，已写回原文件');
+				showStatus('success', '「' + entry.name + '」处理完成');
 
 				// 3 秒后恢复按钮
 				setTimeout(() => {
