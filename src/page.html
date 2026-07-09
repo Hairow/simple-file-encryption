@@ -574,11 +574,13 @@
 							const headSlice = newHead.slice(offset, Math.min(HEAD_SIZE, chunkEnd));
 							bytes.set(headSlice, 0);
 						}
-						// 替换尾部
+						// 替换尾部（可能跨两个 chunk）
 						if (newTail && chunkEnd > fileSize - TAIL_SIZE) {
-							const tailStart = Math.max(0, fileSize - TAIL_SIZE - offset);
-							const tailSlice = newTail.slice(tailStart, tailStart + (chunkEnd - Math.max(fileSize - TAIL_SIZE, offset)));
-							bytes.set(tailSlice, Math.max(0, fileSize - TAIL_SIZE - offset));
+							const tailRegionStart = fileSize - TAIL_SIZE; // 尾部区域起始偏移
+							const writeStart = Math.max(0, tailRegionStart - offset); // 在 bytes 中从哪开始写
+							const tailOffset = offset + writeStart - tailRegionStart; // 对应 newTail 的起始位置
+							const writeLen = Math.min(bytes.length - writeStart, TAIL_SIZE - tailOffset);
+							bytes.set(newTail.slice(tailOffset, tailOffset + writeLen), writeStart);
 						}
 						offset += bytes.length;
 						controller.enqueue(bytes);
