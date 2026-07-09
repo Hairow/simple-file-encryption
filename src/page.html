@@ -558,23 +558,37 @@
 				console.log('[processOneFile] 文件读取完成，提交到服务端...');
 
 				const result = await cryptoCall(headBuf, tailBuf);
-				console.log('[processOneFile] 加解密完成，开始写入文件...');
+				console.log('[processOneFile] 加解密完成，流式写入文件...');
 				const writeStart = performance.now();
-				// keepExistingData: true 要求浏览器保留文件原有内容。
-				// 浏览器实现中，对于大文件（如1GB），这会触发全量加载，导致耗时较长。
-				// 目前 File System Access API 对用户选择的文件不支持原地局部写入，
-				// 这是已知限制。
-				const writable = await entry.handle.createWritable({ keepExistingData: true });
-				let writeElapsed = performance.now() - writeStart;
-				console.log('[processOneFile] 加载文件完成，耗时', writeElapsed < 1000 ? writeElapsed.toFixed(2) + ' ms' : (writeElapsed / 1000).toFixed(1) + ' s');
-				await writable.write(result.head);
-				if (result.tail) {
-					await writable.seek(fileSize - TAIL_SIZE);
-					await writable.write(result.tail);
-				}
-				await writable.close();
-				writeElapsed = performance.now() - writeStart;
-				console.log('[processOneFile] 写入完成，耗时', writeElapsed < 1000 ? writeElapsed.toFixed(2) + ' ms' : (writeElapsed / 1000).toFixed(1) + ' s');
+
+				// 流式处理：读取原始文件流，替换头尾，写入新文件，避免 keepExistingData 全量加载
+				const newHead = new Uint8Array(result.head);
+				const newTail = result.tail ? new Uint8Array(result.tail) : null;
+				let offset = 0;
+				const stream = file.stream().pipeThrough(new TransformStream({
+					transform(chunk, controller) {
+						const bytes = new Uint8Array(chunk);
+						const chunkEnd = offset + bytes.length;
+						// 替换头部
+						if (offset < HEAD_SIZE) {
+							const headSlice = newHead.slice(offset, Math.min(HEAD_SIZE, chunkEnd));
+							bytes.set(headSlice, 0);
+						}
+						// 替换尾部
+						if (newTail && chunkEnd > fileSize - TAIL_SIZE) {
+							const tailStart = Math.max(0, fileSize - TAIL_SIZE - offset);
+							const tailSlice = newTail.slice(tailStart, tailStart + (chunkEnd - Math.max(fileSize - TAIL_SIZE, offset)));
+							bytes.set(tailSlice, Math.max(0, fileSize - TAIL_SIZE - offset));
+						}
+						offset += bytes.length;
+						controller.enqueue(bytes);
+					}
+				}));
+
+				const writable = await entry.handle.createWritable();
+				await stream.pipeTo(writable);
+				const writeElapsed = performance.now() - writeStart;
+				console.log('[processOneFile] 流式写入完成，耗时', writeElapsed < 1000 ? writeElapsed.toFixed(2) + ' ms' : (writeElapsed / 1000).toFixed(1) + ' s');
 
 				fileStatus[index] = 'done';
 				updateFileStatus(index);
