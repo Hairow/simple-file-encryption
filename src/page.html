@@ -558,16 +558,22 @@
 				console.log('[processOneFile] 文件读取完成，提交到服务端...');
 
 				const result = await cryptoCall(headBuf, tailBuf);
-				console.log('[processOneFile] 加解密完成，写入文件...');
+				console.log('[processOneFile] 加解密完成，开始写入文件...');
 				const writeStart = performance.now();
+				// keepExistingData: true 要求浏览器保留文件原有内容。
+				// 浏览器实现中，对于大文件（如1GB），这会触发全量加载，导致耗时较长。
+				// 目前 File System Access API 对用户选择的文件不支持原地局部写入，
+				// 这是已知限制。
 				const writable = await entry.handle.createWritable({ keepExistingData: true });
+				let writeElapsed = performance.now() - writeStart;
+				console.log('[processOneFile] 加载文件完成，耗时', writeElapsed < 1000 ? writeElapsed.toFixed(2) + ' ms' : (writeElapsed / 1000).toFixed(1) + ' s');
 				await writable.write(result.head);
 				if (result.tail) {
 					await writable.seek(fileSize - TAIL_SIZE);
 					await writable.write(result.tail);
 				}
 				await writable.close();
-				const writeElapsed = performance.now() - writeStart;
+				writeElapsed = performance.now() - writeStart;
 				console.log('[processOneFile] 写入完成，耗时', writeElapsed < 1000 ? writeElapsed.toFixed(2) + ' ms' : (writeElapsed / 1000).toFixed(1) + ' s');
 
 				fileStatus[index] = 'done';
