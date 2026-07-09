@@ -59,3 +59,27 @@ npm run deploy
 - 需 HTTPS 或 localhost 环境（File System Access API 要求）
 - 加解密前请关闭被其他程序占用的文件（如 PDF 预览），否则会读取超时
 - 隐藏文件（`.` 开头）不会被列出
+
+
+## 📄 License
+
+MIT © [hairow]
+
+---
+
+> 💡 如果这个项目对你有帮助，欢迎 Star ⭐ 和捐赠支持！
+
+## ☕ 捐赠支持
+
+如果这个插件帮你省了时间，欢迎请我喝杯咖啡~
+
+<div align="center">
+  <table>
+    <tr>
+      <td align="center">
+        <img src="./images/alipay-qr.webp" width="200" alt="支付宝收款码"><br>
+        <b>支付宝</b>
+      </td>
+    </tr>
+  </table>
+</div>
