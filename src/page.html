@@ -368,7 +368,7 @@
 			try {
 				for await (const entry of dirHandle.values()) {
 					console.log('[scanFiles] 遍历到条目:', entry.name, 'kind:', entry.kind);
-					if (entry.kind === 'file') {
+					if (entry.kind === 'file' && !entry.name.startsWith('.')) {
 						fileEntries.push({ name: entry.name, handle: entry });
 					}
 				}
