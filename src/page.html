@@ -254,12 +254,12 @@
 		<h1>文件加解密工具</h1>
 		<p class="subtitle">
 			AES-256-CTR · 流加密，输入输出长度完全相同<br>
-			加密文件大小保持不变<br>
+			加密文件头尾各 100 字节，文件大小保持不变<br>
 		</p>
 		<div class="key-badge"><span class="dot"></span>密钥已加载</div>
 
 		<!-- 目录选择 -->
-		<div class="dir-area" id="dirPicker" onclick="openDirectory()">
+		<div class="dir-area" id="dirPicker" onclick="handleDirClick()">
 			<div class="icon">📂</div>
 			<p>点击选择目录</p>
 		</div>
@@ -282,12 +282,25 @@
 	<script>
 		// ========== 浏览器端加解密逻辑 ==========
 
-		let keyBase64, counterBase64;
+		let keyBase64, counterBase64, cryptoKey = null;
 		(async function loadKeys() {
-			const resp = await fetch('/api/keys');
-			const data = await resp.json();
-			keyBase64 = data.keyBase64;
-			counterBase64 = data.counterBase64;
+			try {
+				const resp = await fetch('/api/keys');
+				const data = await resp.json();
+				keyBase64 = data.keyBase64;
+				counterBase64 = data.counterBase64;
+				console.log('[loadKeys] 密钥获取完成');
+
+				// 页面加载时预导入密钥，避免每次加解密重复导入
+				const rawKey = base64ToArrayBuffer(keyBase64);
+				cryptoKey = await crypto.subtle.importKey(
+					'raw', rawKey,
+					{ name: 'AES-CTR' }, false, ['encrypt', 'decrypt']
+				);
+				console.log('[loadKeys] CryptoKey 导入完成');
+			} catch (e) {
+				console.error('[loadKeys] 失败:', e);
+			}
 		})();
 
 		function base64ToArrayBuffer(base64) {
@@ -295,29 +308,6 @@
 			const bytes = new Uint8Array(binary.length);
 			for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
 			return bytes.buffer;
-		}
-
-		async function importKey(keyB64) {
-			return await crypto.subtle.importKey(
-				'raw', base64ToArrayBuffer(keyB64),
-				{ name: 'AES-CTR' }, false, ['encrypt', 'decrypt']
-			);
-		}
-
-		async function cryptoProcess(arrayBuf) {
-			const HEADER_SIZE = 100;
-			const actualSize = Math.min(HEADER_SIZE, arrayBuf.byteLength);
-
-			const header = arrayBuf.slice(0, actualSize);
-			const cryptoKey = await importKey(keyBase64);
-			const counter = base64ToArrayBuffer(counterBase64);
-			const algo = { name: 'AES-CTR', counter: counter, length: 64 };
-
-			const processedHeader = await crypto.subtle.encrypt(algo, cryptoKey, header);
-
-			const result = new Uint8Array(arrayBuf);
-			result.set(new Uint8Array(processedHeader), 0);
-			return result.buffer;
 		}
 
 		// ========== 目录 & 文件列表 ==========
@@ -329,22 +319,23 @@
 
 		// ========== 目录操作 ==========
 
-		async function openDirectory() {
+		// 非 async 函数，确保 showDirectoryPicker 在用户手势中同步调用
+		function handleDirClick() {
 			if (pickerActive) return;
 			pickerActive = true;
 			hideStatus();
-			console.log('[openDirectory] 开始选择目录...');
-			try {
-				dirHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
-				console.log('[openDirectory] 已选择目录:', dirHandle.name);
+			console.log('[dirClick] isSecureContext:', window.isSecureContext);
+			console.log('[dirClick] API:', typeof window.showDirectoryPicker);
 
+			window.showDirectoryPicker({ mode: 'readwrite' }).then(async (handle) => {
+				console.log('[dirClick] 已选择目录:', handle.name);
+				dirHandle = handle;
 				document.getElementById('dirPicker').style.display = 'none';
 				document.getElementById('dirPath').style.display = 'flex';
-				document.getElementById('dirName').textContent = dirHandle.name;
-
+				document.getElementById('dirName').textContent = handle.name;
 				await scanFiles();
-			} catch (err) {
-				console.error('[openDirectory] 异常:', err.name, err.message);
+			}).catch((err) => {
+				console.error('[dirClick] 异常:', err.name, err.message);
 				if (err.name === 'AbortError') {
 					// 用户取消，不提示
 				} else if (err.name === 'SecurityError' || err.message?.includes('security')) {
@@ -352,9 +343,9 @@
 				} else {
 					showStatus('error', '选择目录失败: ' + err.message);
 				}
-			} finally {
+			}).finally(() => {
 				pickerActive = false;
-			}
+			});
 		}
 
 		function closeDirectory() {
@@ -437,6 +428,21 @@
 			return el.innerHTML;
 		}
 
+		// FileReader 超时包装（5 秒）
+		function readBlobWithTimeout(blob, timeoutMs = 5000) {
+			return Promise.race([
+				new Promise((resolve, reject) => {
+					const r = new FileReader();
+					r.onload = () => resolve(r.result);
+					r.onerror = () => reject(r.error || new Error('文件读取失败'));
+					r.readAsArrayBuffer(blob);
+				}),
+				new Promise((_, reject) =>
+					setTimeout(() => reject(new Error('文件读取超时，可能被其他程序占用，请关闭该文件后重试')), timeoutMs)
+				)
+			]);
+		}
+
 		async function processOne(index) {
 			const entry = fileEntries[index];
 			if (!entry) return;
@@ -450,13 +456,43 @@
 			processingCount++;
 
 			try {
-				const file = await entry.handle.getFile();
-				const arrayBuf = await file.arrayBuffer();
-				const result = await cryptoProcess(arrayBuf);
+				const HEAD_SIZE = 100, TAIL_SIZE = 100;
 
-				const writable = await entry.handle.createWritable();
-				await writable.write(result);
+				console.log('[processOne] 开始处理:', entry.name);
+				const file = await entry.handle.getFile();
+				const fileSize = file.size;
+				console.log('[processOne] 文件大小:', fileSize, 'bytes');
+
+				if (!cryptoKey) throw new Error('密钥未就绪');
+
+				// 只读取头尾，不读整个文件（避免大文件卡死）
+				const counter = base64ToArrayBuffer(counterBase64);
+				const algo = { name: 'AES-CTR', counter: counter, length: 64 };
+				console.log('[processOne] algo 就绪，开始读取头部...');
+
+				// FileReader 带 5 秒超时，文件被锁时不会无限卡死
+				const headBuf = await readBlobWithTimeout(file.slice(0, HEAD_SIZE));
+				console.log('[processOne] 头部读取完成, 加密中...');
+				const encryptedHead = await crypto.subtle.encrypt(algo, cryptoKey, headBuf);
+				console.log('[processOne] 头部加密完成');
+
+				let encryptedTail = null;
+				if (fileSize > HEAD_SIZE + TAIL_SIZE) {
+					const tailBuf = await readBlobWithTimeout(file.slice(fileSize - TAIL_SIZE));
+					console.log('[processOne] 尾部读取完成, 加密中...');
+					encryptedTail = await crypto.subtle.encrypt(algo, cryptoKey, tailBuf);
+					console.log('[processOne] 尾部加密完成');
+				}
+
+				console.log('[processOne] 写入文件...');
+				const writable = await entry.handle.createWritable({ keepExistingData: true });
+				await writable.write(encryptedHead);
+				if (encryptedTail) {
+					await writable.seek(fileSize - TAIL_SIZE);
+					await writable.write(encryptedTail);
+				}
 				await writable.close();
+				console.log('[processOne] 写入完成');
 
 				btn.className = 'file-action-btn done';
 				btn.textContent = '已完成';
@@ -471,6 +507,7 @@
 				}, 3000);
 
 			} catch (err) {
+				console.error('[processOne] 失败:', err);
 				btn.disabled = false;
 				btn.textContent = '加解密';
 				showStatus('error', '处理「' + entry.name + '」失败: ' + err.message);
