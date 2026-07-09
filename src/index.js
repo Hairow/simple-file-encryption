@@ -13,7 +13,7 @@ export default {
 			return new Response("请配置 KEY_BASE64 和 COUNTER_BASE64 环境变量", { status: 500 });
 		}
 
-		// API: 加解密
+		// API: 加解密 
 		if (url.pathname === "/api/crypto" && request.method === "POST") {
 			try {
 				const body = await request.json();
