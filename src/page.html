@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>文件加解密工具</title>
+	<style>
+		* {
+			margin: 0;
+			padding: 0;
+			box-sizing: border-box;
+		}
+
+		body {
+			font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+			background: #f0f2f5;
+			min-height: 100vh;
+			display: flex;
+			justify-content: center;
+			padding: 20px;
+		}
+
+		.container {
+			background: #fff;
+			border-radius: 12px;
+			box-shadow: 0 2px 16px rgba(0, 0, 0, 0.08);
+			width: 100%;
+			max-width: 700px;
+			padding: 32px;
+		}
+
+		h1 {
+			font-size: 22px;
+			color: #1a1a2e;
+			margin-bottom: 8px;
+		}
+
+		.subtitle {
+			color: #8c8c8c;
+			font-size: 13px;
+			line-height: 1.8;
+			margin-bottom: 24px;
+		}
+
+		/* 打开目录区域 */
+		.dir-area {
+			border: 2px dashed #d9d9d9;
+			border-radius: 8px;
+			padding: 32px 20px;
+			text-align: center;
+			cursor: pointer;
+			transition: all 0.2s;
+			margin-bottom: 24px;
+		}
+
+		.dir-area:hover {
+			border-color: #1677ff;
+			background: #f0f5ff;
+		}
+
+		.dir-area p {
+			color: #8c8c8c;
+			font-size: 14px;
+		}
+
+		.dir-area .icon {
+			font-size: 36px;
+			margin-bottom: 8px;
+		}
+
+		.dir-path {
+			display: flex;
+			align-items: center;
+			gap: 8px;
+			padding: 10px 14px;
+			background: #f6f8fa;
+			border-radius: 6px;
+			margin-bottom: 20px;
+			font-size: 13px;
+			color: #1a1a2e;
+		}
+
+		.close-dir-btn {
+			margin-left: auto;
+			padding: 4px 12px;
+			border: 1px solid #d9d9d9;
+			border-radius: 4px;
+			background: #fff;
+			color: #595959;
+			font-size: 12px;
+			cursor: pointer;
+			transition: all 0.15s;
+		}
+
+		.close-dir-btn:hover {
+			border-color: #ff4d4f;
+			color: #ff4d4f;
+		}
+
+		.dir-path .badge {
+			background: #e6f7ff;
+			color: #1677ff;
+			padding: 2px 8px;
+			border-radius: 4px;
+			font-size: 11px;
+			flex-shrink: 0;
+		}
+
+		.dir-path .dir-name {
+			overflow: hidden;
+			text-overflow: ellipsis;
+			white-space: nowrap;
+		}
+
+		/* 文件列表 */
+		.file-list {
+			margin-bottom: 16px;
+		}
+
+		.file-list-header {
+			display: flex;
+			padding: 8px 14px;
+			font-size: 12px;
+			color: #8c8c8c;
+			border-bottom: 1px solid #f0f0f0;
+		}
+
+		.file-row {
+			display: flex;
+			align-items: center;
+			padding: 10px 14px;
+			border-bottom: 1px solid #f0f0f0;
+			font-size: 13px;
+			transition: background 0.15s;
+		}
+
+		.file-row:hover {
+			background: #fafafa;
+		}
+
+		.file-row:last-child {
+			border-bottom: none;
+		}
+
+		.file-row .col-name {
+			flex: 1;
+			overflow: hidden;
+			text-overflow: ellipsis;
+			white-space: nowrap;
+			color: #1a1a2e;
+		}
+
+		.file-row .col-size {
+			width: 90px;
+			flex-shrink: 0;
+			text-align: right;
+			color: #8c8c8c;
+		}
+
+		.file-row .col-action {
+			width: 80px;
+			flex-shrink: 0;
+			text-align: right;
+		}
+
+		.file-action-btn {
+			padding: 4px 12px;
+			border: none;
+			border-radius: 4px;
+			font-size: 12px;
+			cursor: pointer;
+			transition: all 0.15s;
+			font-weight: 500;
+			background: #1677ff;
+			color: #fff;
+		}
+
+		.file-action-btn:hover {
+			background: #4096ff;
+		}
+
+		.file-action-btn:disabled {
+			background: #d9d9d9;
+			cursor: not-allowed;
+		}
+
+		.file-action-btn.done {
+			background: #f6ffed;
+			color: #389e0d;
+			border: 1px solid #b7eb8f;
+		}
+
+		.empty-hint {
+			text-align: center;
+			padding: 32px;
+			color: #bfbfbf;
+			font-size: 13px;
+		}
+
+		/* 状态栏 */
+		.status {
+			margin-top: 12px;
+			padding: 10px 16px;
+			border-radius: 6px;
+			font-size: 13px;
+			display: none;
+		}
+
+		.status.success {
+			display: block;
+			background: #f6ffed;
+			color: #389e0d;
+			border: 1px solid #b7eb8f;
+		}
+
+		.status.error {
+			display: block;
+			background: #fff2f0;
+			color: #cf1322;
+			border: 1px solid #ffa39e;
+		}
+
+		.status.info {
+			display: block;
+			background: #e6f7ff;
+			color: #1677ff;
+			border: 1px solid #91d5ff;
+		}
+
+		.key-badge {
+			display: inline-flex;
+			align-items: center;
+			gap: 6px;
+			background: #f6f8fa;
+			border-radius: 4px;
+			padding: 4px 10px;
+			font-size: 12px;
+			color: #8c8c8c;
+			margin-bottom: 16px;
+		}
+
+		.key-badge .dot {
+			width: 6px;
+			height: 6px;
+			border-radius: 50%;
+			background: #52c41a;
+		}
+	</style>
+</head>
+
+<body>
+	<div class="container">
+		<h1>文件加解密工具</h1>
+		<p class="subtitle">
+			AES-256-CTR · 流加密，输入输出长度完全相同<br>
+			加密文件大小保持不变<br>
+		</p>
+		<div class="key-badge"><span class="dot"></span>密钥已加载</div>
+
+		<!-- 目录选择 -->
+		<div class="dir-area" id="dirPicker" onclick="openDirectory()">
+			<div class="icon">📂</div>
+			<p>点击选择目录</p>
+		</div>
+
+		<!-- 目录路径显示 -->
+		<div class="dir-path" id="dirPath" style="display:none">
+			<span class="badge" id="dirBadge">已打开</span>
+			<span class="dir-name" id="dirName"></span>
+			<button class="close-dir-btn" onclick="closeDirectory()">关闭目录</button>
+		</div>
+
+		<!-- 文件列表 -->
+		<div class="file-list" id="fileList">
+			<div class="empty-hint">请先选择一个目录</div>
+		</div>
+
+		<div class="status" id="status"></div>
+	</div>
+
+	<script>
+		// ========== 浏览器端加解密逻辑 ==========
+
+		let keyBase64, counterBase64;
+		(async function loadKeys() {
+			const resp = await fetch('/api/keys');
+			const data = await resp.json();
+			keyBase64 = data.keyBase64;
+			counterBase64 = data.counterBase64;
+		})();
+
+		function base64ToArrayBuffer(base64) {
+			const binary = atob(base64);
+			const bytes = new Uint8Array(binary.length);
+			for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+			return bytes.buffer;
+		}
+
+		async function importKey(keyB64) {
+			return await crypto.subtle.importKey(
+				'raw', base64ToArrayBuffer(keyB64),
+				{ name: 'AES-CTR' }, false, ['encrypt', 'decrypt']
+			);
+		}
+
+		async function cryptoProcess(arrayBuf) {
+			const HEADER_SIZE = 100;
+			const actualSize = Math.min(HEADER_SIZE, arrayBuf.byteLength);
+
+			const header = arrayBuf.slice(0, actualSize);
+			const cryptoKey = await importKey(keyBase64);
+			const counter = base64ToArrayBuffer(counterBase64);
+			const algo = { name: 'AES-CTR', counter: counter, length: 64 };
+
+			const processedHeader = await crypto.subtle.encrypt(algo, cryptoKey, header);
+
+			const result = new Uint8Array(arrayBuf);
+			result.set(new Uint8Array(processedHeader), 0);
+			return result.buffer;
+		}
+
+		// ========== 目录 & 文件列表 ==========
+
+		let dirHandle = null;
+		let fileEntries = [];  // { name, handle }
+		let processingCount = 0;  // 正在处理中的文件数
+		let pickerActive = false;  // 防止重复打开 picker
+
+		// ========== 目录操作 ==========
+
+		async function openDirectory() {
+			if (pickerActive) return;
+			pickerActive = true;
+			hideStatus();
+			console.log('[openDirectory] 开始选择目录...');
+			try {
+				dirHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
+				console.log('[openDirectory] 已选择目录:', dirHandle.name);
+
+				document.getElementById('dirPicker').style.display = 'none';
+				document.getElementById('dirPath').style.display = 'flex';
+				document.getElementById('dirName').textContent = dirHandle.name;
+
+				await scanFiles();
+			} catch (err) {
+				console.error('[openDirectory] 异常:', err.name, err.message);
+				if (err.name === 'AbortError') {
+					// 用户取消，不提示
+				} else if (err.name === 'SecurityError' || err.message?.includes('security')) {
+					showStatus('error', '需要用户手动点击触发，请确保 HTTPS 或 localhost 访问');
+				} else {
+					showStatus('error', '选择目录失败: ' + err.message);
+				}
+			} finally {
+				pickerActive = false;
+			}
+		}
+
+		function closeDirectory() {
+			if (processingCount > 0) {
+				showStatus('info', '有 ' + processingCount + ' 个文件正在处理中，请稍后...');
+				return;
+			}
+			dirHandle = null;
+			fileEntries = [];
+			document.getElementById('dirPicker').style.display = '';
+			document.getElementById('dirPath').style.display = 'none';
+			document.getElementById('fileList').innerHTML = '<div class="empty-hint">请先选择一个目录</div>';
+			hideStatus();
+		}
+
+		async function scanFiles() {
+			console.log('[scanFiles] 开始扫描目录...');
+			fileEntries = [];
+			try {
+				for await (const entry of dirHandle.values()) {
+					console.log('[scanFiles] 遍历到条目:', entry.name, 'kind:', entry.kind);
+					if (entry.kind === 'file') {
+						fileEntries.push({ name: entry.name, handle: entry });
+					}
+				}
+			} catch (err) {
+				console.error('[scanFiles] 遍历目录失败:', err);
+				showStatus('error', '读取目录内容失败: ' + err.message);
+				return;
+			}
+			fileEntries.sort((a, b) => a.name.localeCompare(b.name));
+			console.log('[scanFiles] 扫描完成，文件数:', fileEntries.length);
+			renderFileList();
+		}
+
+		function renderFileList() {
+			const listEl = document.getElementById('fileList');
+			console.log('[renderFileList] 渲染文件列表, 文件数:', fileEntries.length);
+
+			if (!dirHandle || fileEntries.length === 0) {
+				const msg = !dirHandle ? '请先选择一个目录' : '该目录下没有文件';
+				listEl.innerHTML = '<div class="empty-hint">' + msg + '</div>';
+				return;
+			}
+
+			let html = '<div class="file-list-header">'
+				+ '<span class="col-name">文件名（共 ' + fileEntries.length + ' 个文件）</span>'
+				+ '<span class="col-size">大小</span>'
+				+ '<span class="col-action">操作</span>'
+				+ '</div>';
+			for (let i = 0; i < fileEntries.length; i++) {
+				const entry = fileEntries[i];
+				const id = 'file-row-' + i;
+				html += '<div class="file-row">'
+					+ '<span class="col-name" title="' + escapeHtml(entry.name) + '">' + escapeHtml(entry.name) + '</span>'
+					+ '<span class="col-size" id="' + id + '-size">-</span>'
+					+ '<span class="col-action">'
+					+ '<button class="file-action-btn" id="' + id + '-btn" onclick="processOne(' + i + ')">加解密</button>'
+					+ '</span>'
+					+ '</div>';
+			}
+			listEl.innerHTML = html;
+
+			// 异步加载每个文件的大小
+			for (let i = 0; i < fileEntries.length; i++) {
+				loadFileSize(i);
+			}
+		}
+
+		async function loadFileSize(index) {
+			try {
+				const file = await fileEntries[index].handle.getFile();
+				document.getElementById('file-row-' + index + '-size').textContent = formatSize(file.size);
+			} catch (e) { /* 读取失败就显示 - */ }
+		}
+
+		function escapeHtml(str) {
+			const el = document.createElement('span');
+			el.textContent = str;
+			return el.innerHTML;
+		}
+
+		async function processOne(index) {
+			const entry = fileEntries[index];
+			if (!entry) return;
+
+			const id = 'file-row-' + index;
+			const btn = document.getElementById(id + '-btn');
+			btn.disabled = true;
+			btn.textContent = '处理中...';
+			hideStatus();
+
+			processingCount++;
+
+			try {
+				const file = await entry.handle.getFile();
+				const arrayBuf = await file.arrayBuffer();
+				const result = await cryptoProcess(arrayBuf);
+
+				const writable = await entry.handle.createWritable();
+				await writable.write(result);
+				await writable.close();
+
+				btn.className = 'file-action-btn done';
+				btn.textContent = '已完成';
+				btn.disabled = false;
+				showStatus('success', '「' + entry.name + '」处理完成，已写回原文件');
+
+				// 3 秒后恢复按钮
+				setTimeout(() => {
+					btn.className = 'file-action-btn';
+					btn.textContent = '加解密';
+					btn.disabled = false;
+				}, 3000);
+
+			} catch (err) {
+				btn.disabled = false;
+				btn.textContent = '加解密';
+				showStatus('error', '处理「' + entry.name + '」失败: ' + err.message);
+			} finally {
+				processingCount--;
+			}
+		}
+
+		// ========== 状态提示 ==========
+
+		function hideStatus() {
+			const el = document.getElementById('status');
+			el.className = 'status';
+			el.textContent = '';
+		}
+
+		function showStatus(type, msg) {
+			const el = document.getElementById('status');
+			el.className = 'status ' + type;
+			el.textContent = msg;
+		}
+
+		function formatSize(bytes) {
+			if (bytes < 1024) return bytes + ' B';
+			if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+			return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
+		}
+	</script>
+</body>
+
+</html>

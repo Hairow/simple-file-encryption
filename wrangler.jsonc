@@ -13,6 +13,19 @@
 	"upload_source_maps": true,
 	"compatibility_flags": [
 		"nodejs_compat"
+	],
+	"vars": {
+		// 运行 npm run genkey 生成密钥，填入下面的值
+		"KEY_BASE64": "REDACTED_KEY",
+		"COUNTER_BASE64": "REDACTED_COUNTER"
+	},
+	"rules": [
+		{
+			"type": "Text",
+			"globs": [
+				"**/*.html"
+			]
+		}
 	]
 	/**
 	 * Smart Placement
