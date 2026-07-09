@@ -120,6 +120,7 @@
 
 		.file-list-header {
 			display: flex;
+			align-items: center;
 			padding: 8px 14px;
 			font-size: 12px;
 			color: #8c8c8c;
@@ -133,42 +134,72 @@
 			border-bottom: 1px solid #f0f0f0;
 			font-size: 13px;
 			transition: background 0.15s;
+			cursor: pointer;
+			user-select: none;
 		}
 
 		.file-row:hover {
 			background: #fafafa;
 		}
 
+		.file-row.selected {
+			background: #e6f4ff;
+		}
+
+		.file-row.selected:hover {
+			background: #d6edff;
+		}
+
 		.file-row:last-child {
 			border-bottom: none;
 		}
 
-		.file-row .col-name {
+		.file-row .col-check,
+		.file-list-header .col-check {
+			width: 30px;
+			flex-shrink: 0;
+		}
+
+		.file-row .col-size,
+		.file-list-header .col-size {
+			width: 90px;
+			flex-shrink: 0;
+			text-align: right;
+		}
+
+		.file-row .col-name,
+		.file-list-header .col-name {
 			flex: 1;
 			overflow: hidden;
 			text-overflow: ellipsis;
 			white-space: nowrap;
+		}
+
+		.file-row .col-name {
 			color: #1a1a2e;
 		}
 
-		.file-row .col-size {
-			width: 90px;
+		.file-row .col-status,
+		.file-list-header .col-status {
+			width: 70px;
 			flex-shrink: 0;
 			text-align: right;
-			color: #8c8c8c;
-		}
-
-		.file-row .col-action {
-			width: 80px;
-			flex-shrink: 0;
-			text-align: right;
-		}
-
-		.file-action-btn {
-			padding: 4px 12px;
-			border: none;
-			border-radius: 4px;
 			font-size: 12px;
+		}
+
+		/* 批量操作工具栏 */
+		.batch-bar {
+			display: flex;
+			align-items: center;
+			gap: 12px;
+			margin-bottom: 16px;
+		}
+
+		.batch-btn {
+			padding: 6px 20px;
+			border: none;
+			border-radius: 6px;
+			font-size: 13px;
 			cursor: pointer;
 			transition: all 0.15s;
 			font-weight: 500;
@@ -176,19 +207,18 @@
 			color: #fff;
 		}
 
-		.file-action-btn:hover {
+		.batch-btn:hover {
 			background: #4096ff;
 		}
 
-		.file-action-btn:disabled {
+		.batch-btn:disabled {
 			background: #d9d9d9;
 			cursor: not-allowed;
 		}
 
-		.file-action-btn.done {
-			background: #f6ffed;
-			color: #389e0d;
-			border: 1px solid #b7eb8f;
+		.batch-bar .selected-hint {
+			font-size: 12px;
+			color: #8c8c8c;
 		}
 
 		.empty-hint {
@@ -196,36 +226,6 @@
 			padding: 32px;
 			color: #bfbfbf;
 			font-size: 13px;
-		}
-
-		/* 状态栏 */
-		.status {
-			margin-top: 12px;
-			padding: 10px 16px;
-			border-radius: 6px;
-			font-size: 13px;
-			display: none;
-		}
-
-		.status.success {
-			display: block;
-			background: #f6ffed;
-			color: #389e0d;
-			border: 1px solid #b7eb8f;
-		}
-
-		.status.error {
-			display: block;
-			background: #fff2f0;
-			color: #cf1322;
-			border: 1px solid #ffa39e;
-		}
-
-		.status.info {
-			display: block;
-			background: #e6f7ff;
-			color: #1677ff;
-			border: 1px solid #91d5ff;
 		}
 
 		.key-badge {
@@ -271,12 +271,17 @@
 			<button class="close-dir-btn" onclick="closeDirectory()">关闭目录</button>
 		</div>
 
+		<!-- 批量操作工具栏 -->
+		<div class="batch-bar" id="batchBar" style="display:none">
+			<button class="batch-btn" id="batchBtn" onclick="processSelected()" disabled>加解密</button>
+			<span class="selected-hint" id="selectedHint"></span>
+		</div>
+
 		<!-- 文件列表 -->
 		<div class="file-list" id="fileList">
 			<div class="empty-hint">请先选择一个目录</div>
 		</div>
 
-		<div class="status" id="status"></div>
 	</div>
 
 	<script>
@@ -320,8 +325,10 @@
 
 		let dirHandle = null;
 		let fileEntries = [];  // { name, handle }
-		let processingCount = 0;  // 正在处理中的文件数
-		let pickerActive = false;  // 防止重复打开 picker
+		let selectedSet = new Set();  // 选中的文件索引
+		let processingCount = 0;
+		let fileStatus = {};  // { index: 'done' | 'error' } 每文件处理状态
+		let pickerActive = false;
 
 		// ========== 目录操作 ==========
 
@@ -329,7 +336,6 @@
 		function handleDirClick() {
 			if (pickerActive) return;
 			pickerActive = true;
-			hideStatus();
 			console.log('[dirClick] isSecureContext:', window.isSecureContext);
 			console.log('[dirClick] API:', typeof window.showDirectoryPicker);
 
@@ -342,29 +348,18 @@
 				await scanFiles();
 			}).catch((err) => {
 				console.error('[dirClick] 异常:', err.name, err.message);
-				if (err.name === 'AbortError') {
-					// 用户取消，不提示
-				} else if (err.name === 'SecurityError' || err.message?.includes('security')) {
-					showStatus('error', '需要用户手动点击触发，请确保 HTTPS 或 localhost 访问');
-				} else {
-					showStatus('error', '选择目录失败: ' + err.message);
-				}
 			}).finally(() => {
 				pickerActive = false;
 			});
 		}
 
 		function closeDirectory() {
-			if (processingCount > 0) {
-				showStatus('info', '有 ' + processingCount + ' 个文件正在处理中，请稍后...');
-				return;
-			}
+			if (processingCount > 0) return;
 			dirHandle = null;
 			fileEntries = [];
 			document.getElementById('dirPicker').style.display = '';
 			document.getElementById('dirPath').style.display = 'none';
 			document.getElementById('fileList').innerHTML = '<div class="empty-hint">请先选择一个目录</div>';
-			hideStatus();
 		}
 
 		async function scanFiles() {
@@ -379,7 +374,6 @@
 				}
 			} catch (err) {
 				console.error('[scanFiles] 遍历目录失败:', err);
-				showStatus('error', '读取目录内容失败: ' + err.message);
 				return;
 			}
 			fileEntries.sort((a, b) => a.name.localeCompare(b.name));
@@ -394,31 +388,85 @@
 			if (!dirHandle || fileEntries.length === 0) {
 				const msg = !dirHandle ? '请先选择一个目录' : '该目录下没有文件';
 				listEl.innerHTML = '<div class="empty-hint">' + msg + '</div>';
+				document.getElementById('batchBar').style.display = 'none';
 				return;
 			}
 
+			selectedSet.clear();
+			fileStatus = {};
+
 			let html = '<div class="file-list-header">'
+				+ '<span class="col-check"><input type="checkbox" id="selectAll" onchange="toggleSelectAll()" title="全选"></span>'
 				+ '<span class="col-name">文件名（共 ' + fileEntries.length + ' 个文件）</span>'
 				+ '<span class="col-size">大小</span>'
-				+ '<span class="col-action">操作</span>'
+				+ '<span class="col-status">状态</span>'
 				+ '</div>';
 			for (let i = 0; i < fileEntries.length; i++) {
 				const entry = fileEntries[i];
-				const id = 'file-row-' + i;
-				html += '<div class="file-row">'
+				html += '<div class="file-row" onclick="toggleSelect(' + i + ')">'
+					+ '<span class="col-check"><input type="checkbox" id="cb-' + i + '" onclick="event.stopPropagation()" onchange="toggleSelect(' + i + ')"></span>'
 					+ '<span class="col-name" title="' + escapeHtml(entry.name) + '">' + escapeHtml(entry.name) + '</span>'
-					+ '<span class="col-size" id="' + id + '-size">-</span>'
-					+ '<span class="col-action">'
-					+ '<button class="file-action-btn" id="' + id + '-btn" onclick="processOne(' + i + ')">加解密</button>'
-					+ '</span>'
+					+ '<span class="col-size" id="file-row-' + i + '-size">-</span>'
+					+ '<span class="col-status" id="file-row-' + i + '-status"></span>'
 					+ '</div>';
 			}
 			listEl.innerHTML = html;
 
-			// 异步加载每个文件的大小
+			document.getElementById('batchBar').style.display = 'flex';
+			updateBatchUI();
+
 			for (let i = 0; i < fileEntries.length; i++) {
 				loadFileSize(i);
 			}
+		}
+
+		function toggleSelect(index) {
+			if (selectedSet.has(index)) {
+				selectedSet.delete(index);
+			} else {
+				selectedSet.add(index);
+			}
+			const cb = document.getElementById('cb-' + index);
+			if (cb) {
+				cb.checked = selectedSet.has(index);
+				cb.closest('.file-row').classList.toggle('selected', selectedSet.has(index));
+			}
+			updateSelectAllCheckbox();
+			updateBatchUI();
+		}
+
+		function toggleSelectAll() {
+			const selectAll = document.getElementById('selectAll');
+			if (selectAll.checked) {
+				for (let i = 0; i < fileEntries.length; i++) {
+					selectedSet.add(i);
+					const cb = document.getElementById('cb-' + i);
+					if (cb) { cb.checked = true; cb.closest('.file-row').classList.add('selected'); }
+				}
+			} else {
+				selectedSet.clear();
+				for (let i = 0; i < fileEntries.length; i++) {
+					const cb = document.getElementById('cb-' + i);
+					if (cb) { cb.checked = false; cb.closest('.file-row').classList.remove('selected'); }
+				}
+			}
+			updateBatchUI();
+		}
+
+		function updateSelectAllCheckbox() {
+			const selectAll = document.getElementById('selectAll');
+			if (!selectAll) return;
+			selectAll.checked = selectedSet.size === fileEntries.length;
+			selectAll.indeterminate = selectedSet.size > 0 && selectedSet.size < fileEntries.length;
+		}
+
+		function updateBatchUI() {
+			const btn = document.getElementById('batchBtn');
+			const hint = document.getElementById('selectedHint');
+			btn.disabled = selectedSet.size === 0 || processingCount > 0;
+			hint.textContent = selectedSet.size > 0
+				? '已选 ' + selectedSet.size + ' / ' + fileEntries.length + ' 个文件'
+				: '';
 		}
 
 		async function loadFileSize(index) {
@@ -449,37 +497,68 @@
 			]);
 		}
 
-		async function processOne(index) {
+		async function processSelected() {
+			if (selectedSet.size === 0 || processingCount > 0) return;
+
+			const indices = Array.from(selectedSet);
+
+			// 标记所有选中文件状态
+			for (const i of indices) {
+				fileStatus[i] = 'processing';
+				updateFileStatus(i);
+			}
+			updateBatchUI();
+
+			// 逐个处理
+			for (const i of indices) {
+				await processOneFile(i);
+			}
+		}
+
+		function updateFileStatus(index) {
+			const el = document.getElementById('file-row-' + index + '-status');
+			if (!el) return;
+			switch (fileStatus[index]) {
+				case 'processing':
+					el.textContent = '处理中...';
+					el.style.color = '#1677ff';
+					break;
+				case 'done':
+					el.textContent = '已完成';
+					el.style.color = '#389e0d';
+					break;
+				case 'error':
+					el.textContent = '失败';
+					el.style.color = '#cf1322';
+					break;
+				default:
+					el.textContent = '';
+			}
+		}
+
+		async function processOneFile(index) {
 			const entry = fileEntries[index];
 			if (!entry) return;
 
-			const id = 'file-row-' + index;
-			const btn = document.getElementById(id + '-btn');
-			btn.disabled = true;
-			btn.textContent = '处理中...';
-			hideStatus();
-
 			processingCount++;
+			updateBatchUI();
 
 			try {
 				const HEAD_SIZE = 100, TAIL_SIZE = 100;
 
-				console.log('[processOne] 开始处理:', entry.name);
+				console.log('[processOneFile] 开始处理:', entry.name);
 				const file = await entry.handle.getFile();
 				const fileSize = file.size;
-				console.log('[processOne] 文件大小:', fileSize, 'bytes');
+				console.log('[processOneFile] 文件大小:', fileSize, 'bytes');
 
-				// 读取头尾
-				console.log('[processOne] 读取头部...');
 				const headBuf = await readBlobWithTimeout(file.slice(0, HEAD_SIZE));
 				const tailBuf = fileSize > HEAD_SIZE + TAIL_SIZE
 					? await readBlobWithTimeout(file.slice(fileSize - TAIL_SIZE))
 					: null;
-				console.log('[processOne] 文件读取完成，提交到服务端...');
+				console.log('[processOneFile] 文件读取完成，提交到服务端...');
 
-				// 提交到 Worker 加解密
 				const result = await cryptoCall(headBuf, tailBuf);
-				console.log('[processOne] 加解密完成，写入文件...');
+				console.log('[processOneFile] 加解密完成，写入文件...');
 				const writable = await entry.handle.createWritable({ keepExistingData: true });
 				await writable.write(result.head);
 				if (result.tail) {
@@ -487,42 +566,19 @@
 					await writable.write(result.tail);
 				}
 				await writable.close();
-				console.log('[processOne] 写入完成');
+				console.log('[processOneFile] 写入完成');
 
-				btn.className = 'file-action-btn done';
-				btn.textContent = '已完成';
-				btn.disabled = false;
-				showStatus('success', '「' + entry.name + '」处理完成');
-
-				// 3 秒后恢复按钮
-				setTimeout(() => {
-					btn.className = 'file-action-btn';
-					btn.textContent = '加解密';
-					btn.disabled = false;
-				}, 3000);
+				fileStatus[index] = 'done';
+				updateFileStatus(index);
 
 			} catch (err) {
-				console.error('[processOne] 失败:', err);
-				btn.disabled = false;
-				btn.textContent = '加解密';
-				showStatus('error', '处理「' + entry.name + '」失败: ' + err.message);
+				console.error('[processOneFile] 失败:', err);
+				fileStatus[index] = 'error';
+				updateFileStatus(index);
 			} finally {
 				processingCount--;
+				updateBatchUI();
 			}
-		}
-
-		// ========== 状态提示 ==========
-
-		function hideStatus() {
-			const el = document.getElementById('status');
-			el.className = 'status';
-			el.textContent = '';
-		}
-
-		function showStatus(type, msg) {
-			const el = document.getElementById('status');
-			el.className = 'status ' + type;
-			el.textContent = msg;
 		}
 
 		function formatSize(bytes) {
