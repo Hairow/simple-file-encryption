@@ -14,11 +14,12 @@
 	"compatibility_flags": [
 		"nodejs_compat"
 	],
-	"vars": {
-		// 运行 npm run genkey 生成密钥，填入下面的值
-		"KEY_BASE64": "REDACTED_KEY",
-		"COUNTER_BASE64": "REDACTED_COUNTER"
-	},
+	// vars 仅用于非敏感配置。密钥等敏感信息应使用 wrangler secret put 部署，
+	// 本地开发则写入 .dev.vars（该文件已在 .gitignore 中）。
+	// 运行 npm run genkey 生成密钥后：
+	//   生产: npx wrangler secret put KEY_BASE64 && npx wrangler secret put COUNTER_BASE64
+	//   本地: 创建 .dev.vars，写入 KEY_BASE64=xxx 和 COUNTER_BASE64=xxx
+	"vars": {},
 	"rules": [
 		{
 			"type": "Text",

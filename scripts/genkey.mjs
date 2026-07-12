@@ -28,9 +28,14 @@ async function main() {
     const counter = webcrypto.getRandomValues(new Uint8Array(16));
     const counterBase64 = await arrayBufferToBase64(counter);
 
-    console.log('\n将以下值填入 wrangler.jsonc 的 vars 中:\n');
-    console.log(`KEY_BASE64: ${keyBase64}`);
-    console.log(`COUNTER_BASE64: ${counterBase64}\n`);
+    console.log('\n=== 本地开发 ===');
+    console.log('创建 .dev.vars 文件（已在 .gitignore 中，不会提交到 Git）：\n');
+    console.log(`KEY_BASE64=${keyBase64}`);
+    console.log(`COUNTER_BASE64=${counterBase64}`);
+    console.log('\n=== 生产部署 ===');
+    console.log('运行以下命令将密钥上传到 Cloudflare（加密存储，不会暴露在代码库中）：');
+    console.log(`  npx wrangler secret put KEY_BASE64`);
+    console.log(`  npx wrangler secret put COUNTER_BASE64\n`);
 }
 
 main();
