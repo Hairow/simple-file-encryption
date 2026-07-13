@@ -375,20 +375,55 @@
 			console.log('[compat] isSecureContext:', secure, '| showDirectoryPicker:', hasAPI);
 		})();
 
+		// ========== UA 解析 ==========
+
+		function parseUA(ua) {
+			const m = ua.match(/(Chrome|Firefox|Safari|Edge|Edg|OPR|Opera)\/([\d.]+)/);
+			if (!m) return ua;
+			const name = m[1] === 'Edg' ? 'Edge' : m[1] === 'OPR' ? 'Opera' : m[1];
+			return name + ' ' + m[2];
+		}
+
+		function parseOS(ua) {
+			if (ua.includes('Windows NT 10')) return 'Windows 10';
+			if (ua.includes('Windows NT 6.3')) return 'Windows 8.1';
+			if (ua.includes('Windows NT 6.1')) return 'Windows 7';
+			if (ua.includes('Windows')) return 'Windows';
+			if (ua.includes('Mac OS X')) {
+				const m = ua.match(/Mac OS X ([0-9_]+)/);
+				return m ? 'macOS ' + m[1].replace(/_/g, '.') : 'macOS';
+			}
+			if (ua.includes('Android')) {
+				const m = ua.match(/Android ([0-9.]+)/);
+				return m ? 'Android ' + m[1] : 'Android';
+			}
+			if (ua.includes('iPhone') || ua.includes('iPad')) {
+				const m = ua.match(/OS ([0-9_]+)/);
+				return m ? 'iOS ' + m[1].replace(/_/g, '.') : 'iOS';
+			}
+			if (ua.includes('Linux')) return 'Linux';
+			return '-';
+		}
+
 		// ========== 获取客户端信息 ==========
 
 		(function fetchClientInfo() {
 			fetch('/api/getIP')
 				.then(r => r.json())
 				.then(data => {
+					const ua = data.userAgent || '';
+					const browser = parseUA(ua);
 					const map = {
 						'IP 地址': data.ip,
 						'国家/地区': data.country,
 						'省份/州': data.region,
 						'城市': data.city,
 						'运营商': data.isp,
+						'浏览器': browser,
+						'操作系统': parseOS(ua),
 						'经纬度': data.latitude && data.longitude ? data.latitude + ', ' + data.longitude : '-',
 						'ASN': data.asn,
+						'UA': ua,
 					};
 					let html = '';
 					for (const [label, val] of Object.entries(map)) {
