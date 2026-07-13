@@ -256,6 +256,39 @@
 			font-size: 11px;
 		}
 
+		/* 客户端信息 */
+		.client-info {
+			background: #f6f8fa;
+			border-radius: 6px;
+			padding: 10px 14px;
+			margin-bottom: 16px;
+			font-size: 12px;
+			color: #595959;
+			line-height: 1.8;
+			display: none;
+		}
+
+		.client-info.loaded {
+			display: block;
+		}
+
+		.client-info .info-grid {
+			display: grid;
+			grid-template-columns: 1fr 1fr;
+			gap: 2px 16px;
+		}
+
+		.client-info .info-label {
+			color: #8c8c8c;
+		}
+
+		.client-info .info-title {
+			font-weight: 500;
+			color: #1a1a2e;
+			margin-bottom: 6px;
+			font-size: 13px;
+		}
+
 		.key-badge {
 			display: inline-flex;
 			align-items: center;
@@ -290,6 +323,12 @@
 		<div class="compat-bar" id="compatBar">
 			<span class="compat-item" id="compatSecure"></span>
 			<span class="compat-item" id="compatAPI"></span>
+		</div>
+
+		<!-- 客户端信息 -->
+		<div class="client-info" id="clientInfo">
+			<div class="info-title">客户端信息</div>
+			<div class="info-grid" id="clientInfoGrid"></div>
 		</div>
 
 		<!-- 目录选择 -->
@@ -334,6 +373,33 @@
 			setItem('compatSecure', secure, '安全上下文: ' + (secure ? '已启用' : '未启用'));
 			setItem('compatAPI', hasAPI, '文件系统API: ' + (hasAPI ? '支持' : '不支持'));
 			console.log('[compat] isSecureContext:', secure, '| showDirectoryPicker:', hasAPI);
+		})();
+
+		// ========== 获取客户端信息 ==========
+
+		(function fetchClientInfo() {
+			fetch('/api/getIP')
+				.then(r => r.json())
+				.then(data => {
+					const map = {
+						'IP 地址': data.ip,
+						'国家/地区': data.country,
+						'省份/州': data.region,
+						'城市': data.city,
+						'运营商': data.isp,
+						'经纬度': data.latitude && data.longitude ? data.latitude + ', ' + data.longitude : '-',
+						'ASN': data.asn,
+					};
+					let html = '';
+					for (const [label, val] of Object.entries(map)) {
+						html += '<div><span class="info-label">' + label + ':</span> ' + escapeHtml(String(val || '-')) + '</div>';
+					}
+					document.getElementById('clientInfoGrid').innerHTML = html;
+					document.getElementById('clientInfo').classList.add('loaded');
+				})
+				.catch(err => {
+					console.warn('[clientInfo] 获取失败:', err);
+				});
 		})();
 
 		// ========== 浏览器端工具 ==========

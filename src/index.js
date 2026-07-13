@@ -44,6 +44,26 @@ export default {
 			}
 		}
 
+		// API:获取用户IP
+		if (url.pathname === '/api/getIP') {
+			const { cf } = request;
+			const data = {
+				ip: request.headers.get('cf-connecting-ip'),
+				country: cf?.country,
+				city: cf?.city,
+				region: cf?.region,
+				latitude: cf?.latitude,
+				longitude: cf?.longitude,
+				asn: cf?.asn,
+				isp: cf?.asOrganization,
+				userAgent: request.headers.get('user-agent')
+			};
+
+			return new Response(JSON.stringify(data, null, 2), {
+				headers: { 'content-type': 'application/json;charset=UTF-8' },
+			});
+		}
+
 		// 静态页面
 		return new Response(pageHTML, {
 			headers: { "Content-Type": "text/html; charset=utf-8" },
