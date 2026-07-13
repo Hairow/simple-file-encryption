@@ -416,11 +416,11 @@
 					'国家/地区': data.country,
 					'省份/州': data.region,
 					'城市': data.city,
+					'经纬度': data.latitude && data.longitude ? data.latitude + ', ' + data.longitude : '-',
 					'运营商': data.isp,
+					'ASN': data.asn,
 					'浏览器': parseBrowse(ua),
 					'操作系统': parseOS(ua),
-					'经纬度': data.latitude && data.longitude ? data.latitude + ', ' + data.longitude : '-',
-					'ASN': data.asn,
 					'UA': ua,
 				};
 				let html = '';
