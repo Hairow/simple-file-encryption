@@ -411,7 +411,7 @@
 			fetch('/api/getIP')
 				.then(r => r.json())
 				.then(data => {
-					const ua = data.userAgent || '';
+					const ua = navigator.userAgent;
 					const browser = parseUA(ua);
 					const os = parseOS(ua)
 					const map = {
