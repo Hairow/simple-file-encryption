@@ -56,6 +56,7 @@ export default {
 				longitude: cf?.longitude,
 				asn: cf?.asn,
 				isp: cf?.asOrganization,
+				userAgent: request.headers.get('user-agent')
 			};
 
 			return new Response(JSON.stringify(data, null, 2), {
