@@ -420,8 +420,7 @@
 					'ASN': data.asn,
 					'IP 地址': data.ip,
 					'操作系统': parseOS(ua),
-					'浏览器': parseBrowse(ua),
-					'UA': ua,
+					'浏览器': parseBrowse(ua)
 				};
 				let html = '';
 				for (const [label, val] of Object.entries(map)) {
