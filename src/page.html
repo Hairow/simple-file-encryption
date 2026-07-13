@@ -377,7 +377,7 @@
 
 		// ========== UA 解析 ==========
 
-		function parseUA(ua) {
+		function parseBrowse(ua) {
 			const m = ua.match(/(Chrome|Firefox|Safari|Edge|Edg|OPR|Opera)\/([\d.]+)/);
 			if (!m) return ua;
 			const name = m[1] === 'Edg' ? 'Edge' : m[1] === 'OPR' ? 'Opera' : m[1];
@@ -411,14 +411,13 @@
 			try {
 				const data = await fetch('/api/getIP').then(r => r.json());
 				const ua = data.userAgent;
-				const browser = parseUA(ua);
 				const map = {
 					'IP 地址': data.ip,
 					'国家/地区': data.country,
 					'省份/州': data.region,
 					'城市': data.city,
 					'运营商': data.isp,
-					'浏览器': browser,
+					'浏览器': parseBrowse(ua),
 					'操作系统': parseOS(ua),
 					'经纬度': data.latitude && data.longitude ? data.latitude + ', ' + data.longitude : '-',
 					'ASN': data.asn,
