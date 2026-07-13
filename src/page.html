@@ -407,35 +407,32 @@
 
 		// ========== 获取客户端信息 ==========
 
-		(function fetchClientInfo() {
-			fetch('/api/getIP')
-				.then(r => r.json())
-				.then(data => {
-					const ua = data.ua;
-					const browser = parseUA(ua);
-					const os = parseOS(ua)
-					const map = {
-						'IP 地址': data.ip,
-						'国家/地区': data.country,
-						'省份/州': data.region,
-						'城市': data.city,
-						'运营商': data.isp,
-						'浏览器': browser,
-						'操作系统': os,
-						'经纬度': data.latitude && data.longitude ? data.latitude + ', ' + data.longitude : '-',
-						'ASN': data.asn,
-						'UA': ua,
-					};
-					let html = '';
-					for (const [label, val] of Object.entries(map)) {
-						html += '<div><span class="info-label">' + label + ':</span> ' + escapeHtml(String(val || '-')) + '</div>';
-					}
-					document.getElementById('clientInfoGrid').innerHTML = html;
-					document.getElementById('clientInfo').classList.add('loaded');
-				})
-				.catch(err => {
-					console.warn('[clientInfo] 获取失败:', err);
-				});
+		(async function fetchClientInfo() {
+			try {
+				const data = await fetch('/api/getIP').then(r => r.json());
+				const ua = data.userAgent;
+				const browser = parseUA(ua);
+				const map = {
+					'IP 地址': data.ip,
+					'国家/地区': data.country,
+					'省份/州': data.region,
+					'城市': data.city,
+					'运营商': data.isp,
+					'浏览器': browser,
+					'操作系统': parseOS(ua),
+					'经纬度': data.latitude && data.longitude ? data.latitude + ', ' + data.longitude : '-',
+					'ASN': data.asn,
+					'UA': ua,
+				};
+				let html = '';
+				for (const [label, val] of Object.entries(map)) {
+					html += '<div><span class="info-label">' + label + ':</span> ' + escapeHtml(String(val || '-')) + '</div>';
+				}
+				document.getElementById('clientInfoGrid').innerHTML = html;
+				document.getElementById('clientInfo').classList.add('loaded');
+			} catch (err) {
+				console.warn('[clientInfo] 获取失败:', err);
+			}
 		})();
 
 		// ========== 浏览器端工具 ==========
