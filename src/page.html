@@ -412,15 +412,15 @@
 				const data = await fetch('/api/getIP').then(r => r.json());
 				const ua = data.userAgent;
 				const map = {
-					'IP 地址': data.ip,
 					'国家/地区': data.country,
 					'省份/州': data.region,
 					'城市': data.city,
 					'经纬度': data.latitude && data.longitude ? data.latitude + ', ' + data.longitude : '-',
 					'运营商': data.isp,
 					'ASN': data.asn,
-					'浏览器': parseBrowse(ua),
+					'IP 地址': data.ip,
 					'操作系统': parseOS(ua),
+					'浏览器': parseBrowse(ua),
 					'UA': ua,
 				};
 				let html = '';
