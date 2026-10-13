@@ -34,8 +34,8 @@ async function main() {
     console.log(`COUNTER_BASE64=${counterBase64}`);
     console.log('\n=== 生产部署 ===');
     console.log('运行以下命令将密钥上传到 Cloudflare（加密存储，不会暴露在代码库中）：');
-    console.log(`  npx wrangler secret put KEY_BASE64`);
-    console.log(`  npx wrangler secret put COUNTER_BASE64\n`);
+    console.log(`  pnpm exec wrangler secret put KEY_BASE64`);
+    console.log(`  pnpm exec wrangler secret put COUNTER_BASE64\n`);
 }
 
 main();

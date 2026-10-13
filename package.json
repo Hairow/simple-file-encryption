@@ -9,6 +9,7 @@
     "test": "vitest",
     "genkey": "node scripts/genkey.mjs"
   },
+  "packageManager": "pnpm@12.11.2",
   "devDependencies": {
     "@cloudflare/vitest-pool-workers": "^0.12.4",
     "sharp": "^0.35.3",

@@ -28,8 +28,8 @@
 	],
 	// vars 仅用于非敏感配置。密钥等敏感信息应使用 wrangler secret put 部署，
 	// 本地开发则写入 .dev.vars（该文件已在 .gitignore 中）。
-	// 运行 npm run genkey 生成密钥后：
-	//   生产: npx wrangler secret put KEY_BASE64 && npx wrangler secret put COUNTER_BASE64
+	// 运行 pnpm run genkey 生成密钥后：
+	//   生产: pnpm exec wrangler secret put KEY_BASE64 && pnpm exec wrangler secret put COUNTER_BASE64
 	//   本地: 创建 .dev.vars，写入 KEY_BASE64=xxx 和 COUNTER_BASE64=xxx
 	"vars": {},
 	"rules": [

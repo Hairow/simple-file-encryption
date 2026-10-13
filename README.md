@@ -26,16 +26,16 @@
 
 ```bash
 # 安装依赖
-npm install
+pnpm install
 
 # 生成密钥（将输出填入 wrangler.jsonc 的 vars 中）
-npm run genkey
+pnpm run genkey
 
 # 本地开发
-npm run dev
+pnpm run dev
 
 # 部署到 Cloudflare
-npm run deploy
+pnpm run deploy
 ```
 
 ## 环境变量
